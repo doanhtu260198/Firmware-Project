@@ -1,0 +1,262 @@
+C51 COMPILER V9.52.0.0   EXTI                                                              07/15/2021 17:28:53 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE EXTI
+OBJECT MODULE PLACED IN exti.obj
+COMPILER INVOKED BY: E:\DTVT program\KEIL C 5 8051\C51\BIN\C51.EXE scr\exti.c BROWSE INCDIR(.\inc) DEBUG OBJECTEXTEND PR
+                    -INT(.\exti.lst) TABS(2) OBJECT(exti.obj)
+
+line level    source
+
+   1          #include "SC92F732x_C.H"
+   2          #include "exti.h"
+   3          #include "LEDmultiplexing.h"
+   4          #include "EEPROM.h"
+   5          //----------------------------------------------------------------------------------------------
+   6          //********************************************EXTERN********************************************
+   7          extern char mode;
+   8          //----------------------------------------------------------------------------------------------
+   9          //********************************************DEFINE********************************************
+  10          //DEFINE OPERATION MODE 
+  11          #define START_MODE    0                   //press start button mode 
+  12          #define SETTING_MODE  1                   //press setting mode
+  13          #define RUN_MODE      2                   //press run mode
+  14          #define WAIT_MODE     4                   //press start button mode 
+  15          
+  16          //DEFINE EEPROM ADDRESS 
+  17          #define TIME_AC_ADDR  0                   //eeprom address of time_AC   
+  18          #define TIME_DC_ADDR  1                   //eeprom address of time_DC   
+  19          #define TEMP_SET_ADDR 2                   //eeprom address of temp_set
+  20          
+  21          
+  22          
+  23          //----------------------------------------------------------------------------------------------
+  24          //******************************************PROTOTYPE*******************************************
+  25          extern void delay_us(int time);
+  26          extern void delay_ms(int time);
+  27          //extern void Multiplex_Display(unsigned int Lednum, unsigned int Multiplex_time,char display[8]);
+  28          //----------------------------------------------------------------------------------------------
+  29          //*******************************************VARIABLE*******************************************
+  30          extern unsigned char Display_number[8];
+  31          
+  32          //SETTING VAR
+  33          extern char lastData[8];
+  34          extern char flag_set;
+  35          extern char new_set;
+  36          
+  37          extern char temp_set  ;
+  38          extern char temp_real ;
+  39          extern char time_AC  ;
+  40          extern char time_DC   ;
+  41          
+  42          extern char timeout,timout_int ;
+  43          
+  44          extern unsigned char time_run_AC;               // Running time
+  45          extern unsigned char time_run_DC;               // Running time
+  46          
+  47          extern int timer_thread_1 ;
+  48          //----------------------------------------------------------------------------------------------
+  49          //*******************************************STRUCT*********************************************
+  50          
+  51          //----------------------------------------------------------------------------------------------
+  52          //******************************************FUNCTION********************************************
+  53          //----------------------------------------------------------------------------------------------
+  54          //External interrupt congfig
+C51 COMPILER V9.52.0.0   EXTI                                                              07/15/2021 17:28:53 PAGE 2   
+
+  55          void External_IT_configuration(){
+  56   1        P1CON = 0xCC;                                         //enable INT00,01,10,11
+  57   1        P1PH  = 0xFF;                                         //config as input pull-up
+  58   1        
+  59   1        //-------------------------------------------------------------------------------------------
+  60   1        //config vector interrupt 0 
+  61   1        INT0F = 0X03;                                         //config INT00,01 as FALLING
+  62   1        INT0R = 0x00;                                         //disable INT00 RISING
+  63   1        
+  64   1        //-------------------------------------------------------------------------------------------
+  65   1        //config vector interrupt 1
+  66   1        INT1F = 0X03;                                         //config INT00,01 as FALLING
+  67   1        INT1R = 0x00;                                         //disable INT00 RISING  
+  68   1        
+  69   1        //-------------------------------------------------------------------------------------------
+  70   1        //enable vector interrupt
+  71   1        IE  |= 0x05;                                          //0000 0101 enable INT00 interrupt
+  72   1        IP  |= 0X00;                                          //priority of interrput
+  73   1        EA = 1;           
+  74   1      }
+  75          
+  76          //----------------------------------------------------------------------------------------------
+  77          //External interrupt 0 service
+  78          void EX0() interrupt  0
+  79          {
+  80   1        
+  81   1        char i = 0;                           //for loop "store last data led to blink"
+  82   1        timeout = 0;                          //time out "Auto set mode = START_MODE if not press any setting key"
+  83   1        WDTCON |= 0x10; 
+  84   1        //----------------------------------------------------------------------------------------------
+  85   1        //pressing set button
+  86   1        if(P10 == 0 && mode != RUN_MODE && mode != WAIT_MODE){
+  87   2          mode = SETTING_MODE;
+  88   2          while(P10 == 0){Multiplex_Display(8,20,Display_number);}      ////Anti bounce button
+  89   2          //----------------------------------------------------------------------------------------------
+  90   2          //choosing led will blink
+  91   2          flag_set++; delay_ms(20);
+  92   2          if(flag_set>=7){
+  93   3              flag_set = 0;
+  94   3              //mode = START_MODE;
+  95   3              timout_int=0;
+  96   3              //IE  |= 0x05;
+  97   3          }
+  98   2          //----------------------------------------------------------------------------------------------
+  99   2          //store last data led to blink  
+ 100   2          for(i = 0;i<8;i++){
+ 101   3              lastData[i] = Display_number[i];
+ 102   3          }
+ 103   2          //----------------------------------------------------------------------------------------------
+ 104   2          //led blink case
+ 105   2          switch(flag_set){
+ 106   3            case 1:                               //led time_AC_1
+ 107   3              lastData[4] = 11;
+ 108   3              new_set = Display_number[4];
+ 109   3              break;
+ 110   3            case 2:                               //led time_AC_2
+ 111   3              lastData[5] = 11;
+ 112   3              new_set = Display_number[5];
+ 113   3              break;
+ 114   3            case 3:                               //led time_DC_1
+ 115   3              lastData[0] = 11;
+ 116   3              new_set = Display_number[0];
+C51 COMPILER V9.52.0.0   EXTI                                                              07/15/2021 17:28:53 PAGE 3   
+
+ 117   3              break;
+ 118   3            case 4:                               //led time_DC_2
+ 119   3              lastData[1] = 11;
+ 120   3              new_set = Display_number[1];
+ 121   3              break;
+ 122   3            case 5:                               //led temp_set_1
+ 123   3              lastData[2] = 11;
+ 124   3              new_set = Display_number[2];
+ 125   3              break;
+ 126   3            case 6:                               //led temp_set_2
+ 127   3              lastData[3] = 11;
+ 128   3              new_set = Display_number[3];
+ 129   3              break;
+ 130   3          }         
+ 131   2        }//end pressing set button
+ 132   1        
+ 133   1        //----------------------------------------------------------------------------------------------
+ 134   1        //pressing up/down button
+ 135   1        else if(P11 == 0 && mode != WAIT_MODE){
+ 136   2          while(P11 == 0){Multiplex_Display(8,20,Display_number);}
+ 137   2          //if(timout_int==0){new_set++;timout_int=1;}
+ 138   2          new_set++; //delay_ms(20);
+ 139   2          if(new_set>=10)new_set=0;
+ 140   2          //----------------------------------------------------------------------------------------------
+ 141   2          //store new data
+ 142   2          switch(flag_set){
+ 143   3            case 1:
+ 144   3              //lastData[4] = 11;
+ 145   3               Display_number[4]=new_set;
+ 146   3               time_AC=Display_number[5]*10+Display_number[4];
+ 147   3               IAPWrite(TIME_AC_ADDR,time_AC,0x02);             //write to EEPROM
+ 148   3              break;
+ 149   3            case 2:
+ 150   3              //lastData[5] = 11;
+ 151   3              //new_set = Display_number[5];
+ 152   3              Display_number[5]=new_set;
+ 153   3              time_AC=Display_number[5]*10+Display_number[4];
+ 154   3              IAPWrite(TIME_AC_ADDR,time_AC,0x02);
+ 155   3              break;
+ 156   3            case 3:
+ 157   3              //lastData[0] = 11;
+ 158   3              //new_set = Display_number[0];
+ 159   3              Display_number[0]=new_set;
+ 160   3              time_DC=Display_number[1]*10+Display_number[0];
+ 161   3              IAPWrite(TIME_DC_ADDR,time_DC,0x02);
+ 162   3              break;
+ 163   3            case 4:
+ 164   3              //lastData[1] = 11;
+ 165   3              //new_set = Display_number[1];
+ 166   3              Display_number[1]=new_set;
+ 167   3              time_DC=Display_number[1]*10+Display_number[0];
+ 168   3              IAPWrite(TIME_DC_ADDR,time_DC,0x02);
+ 169   3              break;
+ 170   3            case 5:
+ 171   3              //lastData[2] = 11;
+ 172   3              //new_set = Display_number[2];
+ 173   3              Display_number[2]=new_set;
+ 174   3              temp_set=Display_number[3]*10+Display_number[2];
+ 175   3              IAPWrite(TEMP_SET_ADDR,temp_set,0x02);
+ 176   3              break;
+ 177   3            case 6:
+ 178   3              //lastData[3] = 11;
+C51 COMPILER V9.52.0.0   EXTI                                                              07/15/2021 17:28:53 PAGE 4   
+
+ 179   3              //new_set = Display_number[3];
+ 180   3              Display_number[3]=new_set;
+ 181   3              temp_set=Display_number[3]*10+Display_number[2];
+ 182   3              IAPWrite(TEMP_SET_ADDR,temp_set,0x02);
+ 183   3              break;
+ 184   3          }         
+ 185   2        }//end pressing up/down button
+ 186   1      }
+ 187          
+ 188          //----------------------------------------------------------------------------------------------
+ 189          //External interrupt 1 service
+ 190          void EX1() interrupt  2
+ 191          {
+ 192   1        WDTCON |= 0x10; 
+ 193   1        flag_set=0; 
+ 194   1        time_run_AC = 0;
+ 195   1        time_run_DC = 0;
+ 196   1        //---------------------------------------------------------------------------------------------
+ 197   1        //PRESSING START BUTTON
+ 198   1        if(P14 == 0)
+ 199   1        {
+ 200   2        while(P14 == 0){Multiplex_Display(8,20,Display_number);}
+ 201   2          //---------------------------------------------------------------------------------------------
+ 202   2          //SWITCHING MODE
+ 203   2          if(mode == WAIT_MODE) {
+ 204   3            mode = START_MODE;
+ 205   3          }
+ 206   2          else{
+ 207   3            mode = WAIT_MODE;
+ 208   3            //IE  |= 0x05;
+ 209   3            P50 = 0;
+ 210   3            P16 = 0;
+ 211   3          }
+ 212   2        }
+ 213   1        //---------------------------------------------------------------------------------------------
+ 214   1        //PRESSING RUN BUTTON
+ 215   1        if(P15 == 0 && mode != WAIT_MODE)
+ 216   1        {
+ 217   2          while(P15 == 0){Multiplex_Display(8,20,Display_number);}      
+ 218   2          if((mode == START_MODE) || (mode == SETTING_MODE) ){
+ 219   3            mode = RUN_MODE;
+ 220   3          }
+ 221   2          else if(mode ==RUN_MODE){                               //BUG BUG BUG
+ 222   3            time_run_AC = 0;
+ 223   3            time_run_DC = 0;
+ 224   3            mode = START_MODE;
+ 225   3            }
+ 226   2            P50 = 0;
+ 227   2            P16 = 0;
+ 228   2      
+ 229   2        }
+ 230   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    607    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       1
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+C51 COMPILER V9.52.0.0   EXTI                                                              07/15/2021 17:28:53 PAGE 5   
+
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

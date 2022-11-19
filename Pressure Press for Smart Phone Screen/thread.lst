@@ -1,0 +1,208 @@
+C51 COMPILER V9.52.0.0   THREAD                                                            07/15/2021 17:28:53 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE THREAD
+OBJECT MODULE PLACED IN thread.obj
+COMPILER INVOKED BY: E:\DTVT program\KEIL C 5 8051\C51\BIN\C51.EXE scr\thread.c BROWSE INCDIR(.\inc) DEBUG OBJECTEXTEND 
+                    -PRINT(.\thread.lst) TABS(2) OBJECT(thread.obj)
+
+line level    source
+
+   1          #include "SC92F732x_C.H"
+   2          #include "thread.h"
+   3          #include "intrins.H"
+   4          #include "timer.h"
+   5          #include "LEDmultiplexing.h"
+   6          #include <stdio.h>
+   7          #include <stdlib.h>
+   8          #include <exti.h>
+   9          #include <adc.h>
+  10          #include <Math.H>
+  11          //----------------------------------------------------------------------------------------------
+  12          //********************************************EXTERN********************************************
+  13          //----------------------------------------------------------------------------------------------
+  14          //********************************************DEFINE********************************************
+  15          //THEADING TIMEOUT DEFINE
+  16          #define TIMEOUT_THREAD_1 620              //620ms
+  17          #define TIMEOUT_THREAD_2 50               //50ms
+  18          #define TIMEOUT_THREAD_3 483              //500ms
+  19          #define TIMEOUT_THREAD_4 955              //1000ms
+  20          
+  21          //DEFINE OPERATION MODE 
+  22          #define START_MODE    0                   //press start button mode 
+  23          #define SETTING_MODE  1                   //press setting mode
+  24          #define RUN_MODE      2                   //press run mode
+  25          #define WAIT_MODE     4                   //press start button mode 
+  26          //----------------------------------------------------------------------------------------------
+  27          //******************************************PROTOTYPE*******************************************
+  28          
+  29          //----------------------------------------------------------------------------------------------
+  30          //*******************************************VARIABLE*******************************************
+  31          // THREAD VAR
+  32          static int timer_thread_1 = 0;            //thread time counting 1
+  33          static int timer_thread_2 = 0;            //thread time counting 2
+  34          static int timer_thread_3 = 0;            //thread time counting 3
+  35          static int timer_thread_4 = 0;            //thread time counting 4
+  36          
+  37          //DISPLAY LED VAR
+  38          unsigned char Display_number[8];
+  39          unsigned char codeLed[12]= {0xC0,0xF9,0xA4,0xB0,0x99,0x92,0x82,0xF8,0x80,0x90,0xBF,0xFF};       // 0-9 code P
+             -00-P06
+  40          unsigned char multiplexCode[8]= {0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80};                      // multilex code P20
+             --P27
+  41          unsigned char waitLed[8]= {10,10,10,10,10,10,10,10};                                            // code "- - - -"
+  42          
+  43          //OPERATION MODE VAR
+  44          extern char mode;                               //Operation mode
+  45          
+  46          //ADC VAR
+  47          extern char temperature;                        // ADC read temperature 
+  48                                                      
+  49          //COUNTING TIME VAR
+  50          extern unsigned char time_run_AC;               // Running time
+  51          extern unsigned char time_run_DC;               // Running time
+  52          
+C51 COMPILER V9.52.0.0   THREAD                                                            07/15/2021 17:28:53 PAGE 2   
+
+  53          //SETTING VAR
+  54          extern char temp_set  ;                         //display set temperature
+  55          extern char temp_real ;                         //display real temperature
+  56          extern char time_AC   ;                         //display time AC
+  57          extern char time_DC   ;                         //display time DC
+  58          extern char timeout   ;                         //timeout for setting mode blink maximum 5s
+  59          
+  60          extern char flag_blink;                         //blink flag
+  61          extern char flag_set  ;                         //choosing led will be set when blink in setting mode
+  62          
+  63          //extern char timeout,timout_int ;                
+  64          // extern bit flag_xa;
+  65          
+  66          //----------------------------------------------------------------------------------------------
+  67          //*******************************************STRUCT*********************************************
+  68          
+  69          //*******************************************FUNCTION*******************************************
+  70          //----------------------------------------------------------------------------------------------
+  71          //------------------------------------------THREADING 1-----------------------------------------
+  72          //---------------------------------------------10ms---------------------------------------------
+  73          void thread1(){
+  74   1        
+  75   1      }
+  76          
+  77          //-----------------------------------------------------------------------------------------------
+  78          //------------------------------------------THREADING 2------------------------------------------
+  79          //--------------------------------------------100ms----------------------------------------------
+  80          void thread2(){
+  81   1        //---------------------------------------------------------------------------------------------
+  82   1        //Read ADC temperature value
+  83   1        float tg;
+  84   1        if(mode != WAIT_MODE){
+  85   2          tg = ADC_read();
+  86   2        }
+  87   1        
+  88   1        tg=tg*10;
+  89   1        temperature=(char)(tg/10);
+  90   1        temp_real=temperature+1;
+  91   1        //temp_real=(char)tg%10;
+  92   1        //if(temp_real<=5)temp_real=(char)(tg/10);
+  93   1        //else  temp_real=(char)(tg/10+1);
+  94   1        /*
+  95   1        temperature=10*temp_set- (char)tg; if(temperature<=0)temperature=0;
+  96   1        tg=10*temp_set-tg; if(tg<=0)tg=0;
+  97   1        temperature=(char)tg;
+  98   1        */
+  99   1        if((temp_real-temp_set)>0 &&(temp_real-temp_set)<=6 && (temp_set>35)) temp_real=temp_set;
+ 100   1      
+ 101   1      }
+ 102          
+ 103          //-----------------------------------------------------------------------------------------------
+ 104          //------------------------------------------THREADING 3------------------------------------------
+ 105          //--------------------------------------------500ms----------------------------------------------
+ 106          void thread3(){
+ 107   1        //---------------------------------------------------------------------------------------------
+ 108   1        //------------------------------Blinking led when setting--------------------------------------
+ 109   1        if(mode == SETTING_MODE){
+ 110   2          flag_blink++;
+ 111   2        }
+ 112   1        //---------------------------------------------------------------------------------------------
+ 113   1        //---------TOGGLE MOC3063, OUTPUT Y10-220V, generate heat when temperature < temp set----------
+ 114   1        if(temperature<temp_set ){
+C51 COMPILER V9.52.0.0   THREAD                                                            07/15/2021 17:28:53 PAGE 3   
+
+ 115   2          P51 = ~P51;
+ 116   2        }
+ 117   1        else if(temperature>=temp_set||mode == WAIT_MODE||mode == SETTING_MODE){
+ 118   2          P51 = 0;
+ 119   2        } 
+ 120   1      }
+ 121          
+ 122          //-----------------------------------------------------------------------------------------------
+ 123          //------------------------------------------THREADING 4------------------------------------------
+ 124          //--------------------------------------------1000ms---------------------------------------------
+ 125          void thread4(){
+ 126   1        //P51 = ~P51;
+ 127   1        //---------------------------------------------------------------------------------------------
+ 128   1        //------------Auto set mode = START_MODE if not press any setting key after timeout------------
+ 129   1        if(mode == SETTING_MODE ){timeout++;}
+ 130   1        if(timeout>=5){
+ 131   2          mode = START_MODE;
+ 132   2          flag_set=0;
+ 133   2          timeout=0;
+ 134   2        }
+ 135   1        //---------------------------------------------------------------------------------------------
+ 136   1        //---------------------------------COUNTING TIME IN RUN MODE-----------------------------------
+ 137   1        if(mode == RUN_MODE){
+ 138   2          if(time_run_AC < time_AC){
+ 139   3            time_run_AC++;
+ 140   3            P50 = 1;  
+ 141   3          }
+ 142   2          else if(time_run_DC < time_DC){
+ 143   3            time_run_DC++;
+ 144   3            P16 = 1;
+ 145   3          }
+ 146   2          else if((time_run_AC>=time_AC) && (time_run_DC >= time_DC)){
+ 147   3            time_run_AC = 0;
+ 148   3            time_run_DC = 0;
+ 149   3            P50 = 0;
+ 150   3            P16 = 0;
+ 151   3            mode = START_MODE;
+ 152   3          }
+ 153   2        }
+ 154   1      
+ 155   1        
+ 156   1      }
+ 157          
+ 158          //-----------------------------------------------------------------------------------------------
+ 159          //--------------------------------------CREATING THREADING---------------------------------------
+ 160          void creating_thread_timer(){
+ 161   1        WDTCON |= 0x10; 
+ 162   1        //if(timer_thread_1 < TIMEOUT_THREAD_1){timer_thread_1++;} //thread 10ms
+ 163   1        if(timer_thread_2 < TIMEOUT_THREAD_2){timer_thread_2++;} //thread 100ms
+ 164   1        if(timer_thread_3 < TIMEOUT_THREAD_3){timer_thread_3++;} //thread 1000ms
+ 165   1        if(timer_thread_4 < TIMEOUT_THREAD_4){timer_thread_4++;} //thread 5000ms
+ 166   1      }
+ 167          
+ 168          //-----------------------------------------------------------------------------------------------
+ 169          //--------------------------------------RUN ALL THREADING----------------------------------------
+ 170          void thread_run(){
+ 171   1      
+ 172   1        //if(timer_thread_1 >= TIMEOUT_THREAD_1){thread1();timer_thread_1 = 0;}
+ 173   1        if(timer_thread_2 >= TIMEOUT_THREAD_2){thread2();timer_thread_2 = 0;}
+ 174   1        if(timer_thread_3 >= TIMEOUT_THREAD_3){thread3();timer_thread_3 = 0;}
+ 175   1        if(timer_thread_4 >= TIMEOUT_THREAD_4){thread4();timer_thread_4 = 0;}
+ 176   1      }
+C51 COMPILER V9.52.0.0   THREAD                                                            07/15/2021 17:28:53 PAGE 4   
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    413    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     44       4
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

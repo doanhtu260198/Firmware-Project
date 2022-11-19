@@ -1,0 +1,29 @@
+A51 MACRO ASSEMBLER  SINONE                                                               01/12/2021 11:19:33 PAGE     1
+
+
+MACRO ASSEMBLER A51 V8.02b
+NO OBJECT MODULE REQUESTED
+ASSEMBLER INVOKED BY: E:\DTVT program\KEIL C 5 8051\C51\BIN\A51.EXE SinOne.soc INCDIR(.\inc) SET(SMALL) DEBUG EP
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     Li Xiangxing
+*** _________________________^
+*** ERROR #A9 IN 1 (SinOne.soc, LINE 1): SYNTAX ERROR
+*** WARNING #A41 IN 1 (SinOne.soc, LINE 1): MISSING 'END' STATEMENT
+A51 MACRO ASSEMBLER  SINONE                                                               01/12/2021 11:19:33 PAGE     2
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E             T Y P E  V A L U E   ATTRIBUTES
+
+LI . . . . . . . .    ----   -----       
+XIANGXING. . . . .    ----   -----       
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  1 WARNING(S), 1 ERROR(S)

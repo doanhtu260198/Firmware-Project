@@ -1,0 +1,121 @@
+C51 COMPILER V9.52.0.0   UART                                                              07/15/2021 17:28:53 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE UART
+OBJECT MODULE PLACED IN uart.obj
+COMPILER INVOKED BY: E:\DTVT program\KEIL C 5 8051\C51\BIN\C51.EXE scr\uart.c BROWSE INCDIR(.\inc) DEBUG OBJECTEXTEND PR
+                    -INT(.\uart.lst) TABS(2) OBJECT(uart.obj)
+
+line level    source
+
+   1          #include "SC92F732x_C.H"
+   2          #include "uart.h"
+   3          //----------------------------------------------------------------------------------------------
+   4          //********************************************EXTERN********************************************
+   5          
+   6          //----------------------------------------------------------------------------------------------
+   7          //********************************************DEFINE********************************************
+   8          
+   9          //----------------------------------------------------------------------------------------------
+  10          //******************************************PROTOTYPE*******************************************
+  11          
+  12          //----------------------------------------------------------------------------------------------
+  13          //*******************************************VARIABLE*******************************************
+  14          bit UartSendFlag    = 0; // interrupt send flag
+  15          bit UartReceiveFlag = 0; // interrupt receive flag
+  16          
+  17          //----------------------------------------------------------------------------------------------
+  18          //*********************************************ENUM*********************************************
+  19          
+  20          //----------------------------------------------------------------------------------------------
+  21          //*******************************************STRUCT*********************************************
+  22          
+  23          //----------------------------------------------------------------------------------------------
+  24          //******************************************FUNCTION********************************************
+  25          //----------------------------------------------------------------------------------------------
+  26          //-------------------------------config uart using timer 1 at 12Mhz ----------------------------
+  27          /* Baurate formula
+  28             Baudrate = ((2^SMOD)/16) * (fn1/((256-TH1)*2))
+  29             fn1 = fsys (if T1FD = 1)
+  30             fn1 = fsys/12 (if T1FD = 0)
+  31             SMOD bit in PCON register
+  32             TH1 in TH1 register
+  33          */
+  34          void Uart0_Init(void)    
+  35          {
+  36   1        P1CON &= 0XF3;
+  37   1        P1PH  |= 0X0C;     //TX/RX pull up
+  38   1        P13    = 1;        //TX set to 1
+  39   1        SCON   = 0X50;     /*mode 01: config full-duplex, 1 bit start, 1 bit stop, 8 bit data 
+  40   1                             RI set upon receiving complete data frame ==> generate interrupt request*/
+  41   1        PCON  |= 0X80;     //operate under 1/32 system clock, using timer ==> not using system clock ==> parameter
+             - of baudrate
+  42   1        T2CON  = 0x00;     /*TCLK and RCLK set to 00 ==> timer 1 is clock source of baudrate
+  43   1                             TCLK or RCLK set to 1 ==> timer 2 is clock source of baudrate*/
+  44   1        TMOD   = 0X20;     //timer 1 operating mode 2: 8bit auto-reload mode
+  45   1        TMCON  = 0X02;     //bit T1FD = 1 ==> fn1 = Fsys, bit T1FD = 0 ==> fn1 = Fsys/12
+  46   1        TL1    = 217;      //parameter to calculate baudrate
+  47   1        TH1    = 217;      //parameter to calculate baudrate, TH1 and TL1 = 217 ==>baudrate ~= 19200,TH1 and TL1 = 
+             -178 ==>baudrate ~= 9600
+  48   1        TR1    = 1;        //Turn on Timer1 
+  49   1        EUART  = 1;        //Enable UART
+  50   1        EA     = 1;        //allow global interrupt
+  51   1        
+  52   1        
+C51 COMPILER V9.52.0.0   UART                                                              07/15/2021 17:28:53 PAGE 2   
+
+  53   1        
+  54   1      }
+  55          
+  56          //------------------------------------------------------------------------------------------------
+  57          //----------------------------------------UART send data -----------------------------------------
+  58          // param: dat: data to send.
+  59          void Uart0_Send(unsigned char dat)
+  60          {
+  61   1        SBUF = dat;
+  62   1        while(!UartSendFlag);
+  63   1        UartSendFlag = 0;
+  64   1      }
+  65          
+  66          
+  67          //-------------------------------------------------------------------------------------------------
+  68          //-------------------------------------UART send string data --------------------------------------
+  69          // param: *str: string data to send.
+  70          void Uart0_Send_String(unsigned char *str)
+  71          {
+  72   1        int i;
+  73   1        for(i=0;str[i]!=0;i++)  // Send each char of string till the NULL 
+  74   1        {
+  75   2          Uart0_Send(str[i]);   // Call transmit data function 
+  76   2        }
+  77   1      }
+  78          
+  79          //------------------------------------------------------------------------------------------------
+  80          //----------------------------------ISR interrupt 4 for uart 0------------------------------------
+  81          void UartInt(void) interrupt 4
+  82          {
+  83   1        if(TI)
+  84   1        {
+  85   2          TI = 0; 
+  86   2          UartSendFlag = 1;   
+  87   2        }
+  88   1        if(RI)
+  89   1        {
+  90   2          RI = 0; 
+  91   2          UartReceiveFlag = 1;
+  92   2        } 
+  93   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     95    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       3
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      2    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

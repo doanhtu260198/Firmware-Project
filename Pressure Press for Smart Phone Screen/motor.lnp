@@ -1,0 +1,13 @@
+"STARTUP.obj",
+"main.obj",
+"timer.obj",
+"LEDmultiplexing.obj",
+"thread.obj",
+"exti.obj",
+"pwm.obj",
+"adc.obj",
+"EEPROM.obj",
+"uart.obj" 
+TO "motor" 
+RAMSIZE(256) 
+XDATA( 0x27 )

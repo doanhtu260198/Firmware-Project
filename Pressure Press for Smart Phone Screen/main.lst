@@ -1,0 +1,204 @@
+C51 COMPILER V9.52.0.0   MAIN                                                              07/15/2021 17:28:52 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.obj
+COMPILER INVOKED BY: E:\DTVT program\KEIL C 5 8051\C51\BIN\C51.EXE scr\main.c BROWSE INCDIR(.\inc) DEBUG OBJECTEXTEND PR
+                    -INT(.\main.lst) TABS(2) OBJECT(main.obj)
+
+line level    source
+
+   1          #include "SC92F732x_C.H"
+   2          #include "intrins.H"
+   3          #include "timer.h"
+   4          #include "LEDmultiplexing.h"
+   5          #include <stdio.h>
+   6          #include <stdlib.h>
+   7          #include <thread.h>
+   8          #include <exti.h>
+   9          //#include <pwm.h>
+  10          #include <adc.h>
+  11          #include <Math.H>
+  12          #include "EEPROM.h"
+  13          #include "uart.h"
+  14          
+  15          //----------------------------------------------------------------------------------------------
+  16          //********************************************DEFINE********************************************
+  17          //DEFINE OPERATION MODE 
+  18          #define START_MODE    0                       //press start button mode                 
+  19          #define SETTING_MODE  1                       //press setting mode
+  20          #define RUN_MODE      2                       //press run mode
+  21          #define WAIT_MODE     4                       //press start button mode 
+  22          
+  23          //DEFINE EEPROM ADDRESS 
+  24          #define TIME_AC_ADDR  0                       //eeprom address of time_AC   
+  25          #define TIME_DC_ADDR  1                       //eeprom address of time_DC   
+  26          #define TEMP_SET_ADDR 2                       //eeprom address of temp_set
+  27          //----------------------------------------------------------------------------------------------
+  28          //******************************************PROTOTYPE*******************************************
+  29          void delay_us(int time);
+  30          void delay_ms(int time);
+  31          
+  32          //----------------------------------------------------------------------------------------------
+  33          //*******************************************VARIABLE*******************************************
+  34          //DISPLAY LED VAR
+  35          extern unsigned char Display_number[8];       // array for storing display number
+  36          extern unsigned char codeLed[12];             // 0-9 code P00-P06
+  37          extern char multiplexCode[8];                 // multilex code P20-P27
+  38          extern unsigned char waitLed[8];
+  39          //MODE VAR
+  40          char mode = WAIT_MODE;                        // Operation mode
+  41          
+  42          //ADC VAR
+  43          char temperature= 0;                          // ADC read temperature 
+  44          
+  45          //COUNTING TIME VAR
+  46          unsigned char time_run_AC = 0;                // Running time
+  47          unsigned char time_run_DC = 0;                // Running time
+  48          
+  49          
+  50          //SETTING VAR
+  51          char temp_set   = 40;                         //display set temperature
+  52          char temp_real  = 0;                          //display real temperature
+  53          char time_AC    = 30;                         //display time AC
+  54          char time_DC    = 20;                         //display time DC
+C51 COMPILER V9.52.0.0   MAIN                                                              07/15/2021 17:28:52 PAGE 2   
+
+  55          
+  56          
+  57          char new_set = 0;                             //choosing number display when blink in setting mode
+  58          char lastData[8] = {8};                       //array for storing old data to blink
+  59          char flag_set = 0;                            //choosing led will be set when blink in setting mode
+  60          char flag_blink = 0;                          //blink flag
+  61          char timeout = 0;                             //timeout for setting mode blink maximum 5s
+  62          
+  63          
+  64          char test_uart = 10;
+  65          char *string_uart = "hello";
+  66          //----------------------------------------------------------------------------------------------
+  67          //*******************************************STRUCT*********************************************
+  68          
+  69          
+  70          //==============================================================================================
+  71          //********************************************MAIN**********************************************
+  72          void main(){
+  73   1        
+  74   1        //--------------------------------------------------------------------------------------------
+  75   1        //INPUT  = 0
+  76   1        //OUTPUT = 1
+  77   1        P0CON = 0xFF;                             //config port0 is OUTPUT
+  78   1        P0PH  = 0x00;                             //set output port0 is LOW
+  79   1        
+  80   1        P1CON = 0x00;                             //config port1 is INPUT 
+  81   1        P1PH  = 0xFF;                             //set output port1 is HIGH
+  82   1        
+  83   1        P2CON = 0xFF;                             //config port2 is OUTPUT
+  84   1        P2PH  = 0x00;                             //set output port2 is LOW
+  85   1        
+  86   1        P5CON = 0xFF;                             //config port3 is OUTPUT  
+  87   1        P5PH  = 0x00;                             //set output port3 is LOW
+  88   1        
+  89   1        //--------------------------------------------------------------------------------------------
+  90   1        //--------------------------------------READ EEPROM-------------------------------------------
+  91   1        time_AC  = IAPRead(TIME_AC_ADDR,0x02);    //read time_AC from EEPROM at TIME_AC_ADDR address
+  92   1        time_DC  = IAPRead(TIME_DC_ADDR,0x02);    //read time_DC from EEPROM at TIME_DC_ADDR address
+  93   1        temp_set = IAPRead(TEMP_SET_ADDR,0x02);   //read temp_set from EEPROM at TEMP_SET_ADDR address
+  94   1        
+  95   1        //--------------------------------------------------------------------------------------------
+  96   1        //--------------------------------------SYSTEM INIT-------------------------------------------
+  97   1        Timer0_Init();                            //Timer init
+  98   1        External_IT_configuration();              //external interrupt config
+  99   1        ADC_configuration(8);                     //ADC config
+ 100   1        Uart0_Init();                             //uart 0 config
+ 101   1        //--------------------------------------------------------------------------------------------
+ 102   1        //----------------------------------------WDT INIT--------------------------------------------
+ 103   1        WDTCON |= 0x10;
+ 104   1        delay_ms(50);
+ 105   1        
+ 106   1        
+ 107   1        Uart0_Send(test_uart);
+ 108   1        Uart0_Send_String(string_uart);
+ 109   1        while(1){
+ 110   2          //------------------------------------------------------------------------------------------
+ 111   2          //-----------------------------------WAIT_MODE----------------------------------------------
+ 112   2          while(mode == WAIT_MODE){
+ 113   3              WDTCON |= 0x10; 
+ 114   3              Multiplex_Display(8,10,waitLed);          //display "- - - -"
+ 115   3              thread_run();
+ 116   3              P51 = 0;
+C51 COMPILER V9.52.0.0   MAIN                                                              07/15/2021 17:28:52 PAGE 3   
+
+ 117   3          }
+ 118   2          
+ 119   2          //------------------------------------------------------------------------------------------
+ 120   2          //-----------------------------------START_MODE---------------------------------------------
+ 121   2          while(mode == START_MODE){
+ 122   3            WDTCON |= 0x10; 
+ 123   3            splitNumber();
+ 124   3            Multiplex_Display(8,10,Display_number);
+ 125   3            thread_run();
+ 126   3          }//end START_MODE
+ 127   2          
+ 128   2          //------------------------------------------------------------------------------------------
+ 129   2          //----------------------------------SETTING_MODE--------------------------------------------
+ 130   2          while(mode == SETTING_MODE){
+ 131   3            WDTCON |= 0x10; 
+ 132   3            //----------------------------------------------------------------------------------------
+ 133   3            //---------------------------------Blink led----------------------------------------------
+ 134   3            if(flag_blink == 0){
+ 135   4              Multiplex_Display(8,10,lastData);
+ 136   4            }
+ 137   3            else{
+ 138   4              Multiplex_Display(8,10,Display_number);
+ 139   4              if(flag_blink>=2){
+ 140   5                flag_blink = 0;
+ 141   5              }
+ 142   4            }
+ 143   3            
+ 144   3            thread_run();
+ 145   3            P51 = 0;
+ 146   3          }//end SETTING_MODE
+ 147   2          
+ 148   2          //------------------------------------------------------------------------------------------
+ 149   2          //------------------------------------RUN_MODE----------------------------------------------
+ 150   2          while(mode == RUN_MODE){
+ 151   3            WDTCON |= 0x10; 
+ 152   3            splitNumberRunTime();
+ 153   3            Multiplex_Display(8,10,Display_number);
+ 154   3            thread_run();
+ 155   3          }//end RUN_MODE
+ 156   2                  
+ 157   2        }
+ 158   1      
+ 159   1      }
+ 160          //==============================================================================================
+ 161          //==============================================================================================
+ 162          
+ 163          //----------------------------------------------------------------------------------------------
+ 164          //*******************************************FUNCTION*******************************************
+ 165          //delay approximately us 
+ 166          void delay_us(int time){
+ 167   1        while(time--){if(time<=0)break;}
+ 168   1      }
+ 169          
+ 170          //delay approximately ms 
+ 171          void delay_ms(int time){
+ 172   1        while(time--){delay_us(150);if(time<=0)break;}
+ 173   1      }
+ 174          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    292    ----
+C51 COMPILER V9.52.0.0   MAIN                                                              07/15/2021 17:28:52 PAGE 4   
+
+   CONSTANT SIZE    =      6    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     24    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
