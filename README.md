@@ -8,7 +8,7 @@
     + display information about heat, pressure, running and setting time on 7 segment LED
     + save config to EEROM
 
-- FM_receiver: arduino IDE
+- FM_receiver: 
   - Main function:
     + Using 3 buttons to config volume, set RSSI threshold, backlight turn off time after config.
     + Display Volume, RSSI, configuration on LCD 16x2.
