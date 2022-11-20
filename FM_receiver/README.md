@@ -1,5 +1,5 @@
--FM_receiver
-  -Main function:
+- FM_receiver
+  - Main function:
     + Using 3 buttons to config volume, set RSSI threshold, backlight turn off time after config.
     + Display Volume, RSSI, configuration on LCD 16x2.
     + Save setting data on EEROM of MCU
